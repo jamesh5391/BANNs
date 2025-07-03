@@ -274,7 +274,9 @@ def annotateSets(SNPList, geneList, buffer=0):
 			pbar.update(1)
 	dfAnnotation=dfAnnotation[dfAnnotation.astype(str)["SNPindex"] != '[]'] #Drop SNP-sets with no SNPs in them
 	dfAnnotation=dfAnnotation.sort_index()
+	#is this index required? 
 	dfAnnotation.index = range(len(dfAnnotation))  #Reassign indices
+	
 	return dfAnnotation
 
 def annotatePathways(annotationDF):
@@ -300,6 +302,11 @@ def dropSingletonSets(annotationDF, SNPList, geneList, buffer):
 	annotationDF=annotateSets(SNPList, geneList, buffer=buffer)
 	return annotationDF
 
+def pruneExtraneousSNPs():
+	#make sure SNP List indices are adjusted 
+	
+	return
+	
 def annotate(path_SNPList, path_geneGuide,  outputFile, intergenic=False, buffer=0, dropSingletons=False):
 	"""
 	Function to create a SNP-to-SNPset annotation dataframe. 
@@ -336,6 +343,8 @@ def annotate(path_SNPList, path_geneGuide,  outputFile, intergenic=False, buffer
 		print("Dropping SNP-sets that are singletons (containing only one SNP) and re-annotating SNPs without them")
 		dfAnnotation=dropSingletonSets(dfAnnotation, SNPList, geneList, buffer=buffer)
 
+	#Remove all irrelevant SNPs that don't map to any genes
+
 	# Save the resulting annotationDF to a file for future reference:
 	message="Saving annotation results to file "+outputFile
 	print(message)
@@ -371,7 +380,7 @@ def getMaskMatrix(SNPList_path, annotationDF, outputFile):
 	message="Saving annotation mask to file "+outputFile+" in tab-delimited format"
 	np.savetxt(outputFile, mask, delimiter="\t")
 	print(message)
-	return masks
+	return mask
 
 def getPathwayMatrix(SNPList_path, annotationDF, pathwayDF, outputFile):
 	# p = len of snp list (make sure snp list already deleted snps that dont match to genes)
@@ -379,12 +388,29 @@ def getPathwayMatrix(SNPList_path, annotationDF, pathwayDF, outputFile):
 	q = len(pathwayDF)
 	mask = np.zeros((p, q))
 	for col_idx, pathway_row in pathwayDF.iterrows():
-		geneSet = pathway_row['Gene_Set']
-		for 
-	
+		geneSet = set(pathway_row['Gene_Set'])
+		pathwaySNPidxs = set()
+		for gene in geneSet: 
+			geneSNPs = annotationDF[annotationDF['GeneID'] == gene]
+			if not geneSNPs.empty:
+				for snp_idx_list in geneSNPs['SNPindex']:
+					pathwaySNPidxs.update(snp_idx_list)
+		if geneSet:
+			mask[list(pathwaySNPidxs), col_idx] = 1
+	'''
+	potential edge cases: 
+		multiple rows with same geneID in dfAnnotation?
+		pathway has 0 genes found and thus 0 snps
+		pathway has x genes but no snps
+		what if there are genes that don't belong to any pathways?
+	'''
+	message="Saving pathway annotation mask to file "+outputFile+" in tab-delimited format"
+	np.savetxt(outputFile, mask, delimiter="\t")
+	print(message)
+	return mask 
 
+		
 
+			
 
-
-    # todo: prune snps that dont match to pathways 
-    return
+    # todo: prune snps that dont match to pathways
