@@ -87,11 +87,24 @@ class BANNs(object):
 		self.SNP_layer.train(self.X, self.y, 10000)
 		self.SNP_layer.w = normalizelogweights(self.SNP_layer.logw)
 		b=rep_col(np.sum(self.SNP_layer.w * self.SNP_layer.pip*self.SNP_layer.kernel, axis=1),self.mask.shape[1])
+		# can extract activations from G 
+		# g -> N individuals x number of snp sets, each cell represents activation score 
 		self.G=np.matmul(self.X,self.mask*b)
 		self.SET_layer=HiddenLayer(self.G,self.y,self.nModelsSET)
 		self.SET_layer.train(self.G, self.y, 10000)
 		self.SET_layer.w = normalizelogweights(self.SET_layer.logw)
 
+		'''
+		c = rep_col(np.sum(self.SET_layer.w * self.SET_layer.pip * self.SET_layer.kernel, axis=1), self.pathway_mask.shape[1])
+		
+
+		self.P = np.matmul(self.G, self.pathway_mask * c)
+		self.PATH_layer=HiddenLayer(self.P, self.y, nModelsPATH) #need to define nmodels still
+		self.PATH_layer.train(self.P , self.y, 10000)
+		self.PATH_layer.w = normalizelogweights(self.PATH_layer.logw)
+		'''
+
+	
 		self.SNP_layer.pve=self.estimatePVE(self.SNP_layer,self.X)
 		self.SET_layer.pve=self.estimatePVE(self.SET_layer,self.G)
 		self.summarize_results(self.SNP_layer)
@@ -121,3 +134,8 @@ class BANNs(object):
 
 # plt.scatter(np.arange(len(pips2)), pips2)
 # plt.show()
+
+
+
+
+

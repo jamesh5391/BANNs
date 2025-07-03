@@ -31,6 +31,7 @@ import pandas as pd
 import numpy as np 
 from tqdm import tqdm #just for progress bars 
 import natsort as ns #natural sorting
+from collections import Counter
 import sys
 import time 
 import math
@@ -118,6 +119,52 @@ def read_gene_file(path_geneGuide):
 	geneGuide.End = geneGuide.End.astype('int32') # Locations should be read as integers for ease of comparison in annotation
 	
 	return geneGuide
+'''
+def read_pathway_file(path_pathwayAnnotation):
+	dfPathway = pd.DataFrame(pd.read_csv(path_pathwayAnnotation, sep='\t', header=None))
+	dfPathway.columns = ["Pathway ID", "Pathway Description", "Gene Set"]
+
+	return dfPathway
+'''
+
+def read_pathway_file(path_pathwayAnnotation):
+    """
+    Reads an MSigDB GMT file into a pandas DataFrame.
+    GMT format: Pathway ID \t Pathway Description \t Gene1 \t Gene2 \t ...
+    Each line (pathway) can have a different number of genes.
+    """
+    pathway_data = [] # List to store dictionaries, each representing a pathway's data
+    try:
+        with open(path_pathwayAnnotation, 'r', encoding='utf-8') as f: # Specify encoding for robustness
+            for line_num, line in enumerate(f, 1): # Enumerate to get line number for better error messages
+                # Remove leading/trailing whitespace and split by tab
+                parts = line.strip().split('\t')
+                
+                # A valid GMT line must at least have Pathway ID and Description
+                if len(parts) < 2:
+                    if line.strip(): # If it's not just an empty line
+                        print(f"Warning: Skipping malformed line {line_num} (less than 2 fields): {line.strip()}")
+                    continue 
+                
+                pathway_id = parts[0]
+                pathway_description = parts[1]
+                gene_set = parts[2:] # All subsequent parts are the genes, stored as a list
+
+                pathway_data.append({
+                    "Pathway_ID": pathway_id,
+                    "Pathway_Description": pathway_description,
+                    "Gene_Set": gene_set # Store the list of genes directly in a column
+                })
+        
+        # Create DataFrame from the collected data
+        dfPathway = pd.DataFrame(pathway_data)
+    
+        return dfPathway
+
+    except FileNotFoundError:
+        sys.exit(f"Error: Pathway annotation file not found at '{path_pathwayAnnotation}'. Please check the path.")
+    except Exception as e:
+        sys.exit(f"Error reading or parsing pathway annotation file (line {line_num}): {e}. Content: {line.strip()}")
 
 ##################################################################################################################################
 ################################################  CREATE ANNOTATION DATAFRAMES  ##################################################
@@ -330,3 +377,45 @@ def getMaskMatrix(SNPList_path, annotationDF, outputFile):
 	np.savetxt(outputFile, mask, delimiter="\t")
 	print(message)
 	return mask
+
+'''
+def annotatePath(dfPathway):
+     
+'''
+def getPathwayMaskMatrix(dfPathway, dfAnnotation, outputFile): 
+	#get cardinality of total gene set 
+
+	#actual maybe use geneList.size()
+	#count = Counter()
+	#count.update(gene for gene_list in dfPathway['Gene Set'] for gene in gene_list)
+	#total_genes = len(count)
+
+	gene_list = dfAnnotation["GeneID"].tolist()
+	n_genes = len(gene_list)
+
+	pathways = dfPathway['Pathway_ID'].tolist()
+	n_pathways = len(pathways)
+
+	mask = np.zeroes((n_genes, n_pathways))
+
+	gene_to_row_index = {gene_name: i for i, gene_name in enumerate(gene_list)}
+
+	for col_idx, pathway_row in tqdm(dfPathway.iterrows(), total=n_pathways):
+		member_genes = set(pathway_row["Gene_Set"])
+
+		for gene in member_genes:
+			if gene in gene_to_row_index:
+				row_idx = gene_to_row_index[gene]
+				mask[row_idx, col_idx] = 1
+	
+	matrix_df = pd.DataFrame(mask, index=gene_list, columns=pathways)
+	
+	message = f"Saving gene-pathway annotation matrix to {outputFile}"
+	print(message)
+	matrix_df.to_csv(outputFile, sep="\t")
+
+	return matrix_df
+
+
+
+

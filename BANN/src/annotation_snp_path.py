@@ -119,6 +119,45 @@ def read_gene_file(path_geneGuide):
 	
 	return geneGuide
 
+def read_pathway_file(path_pathwayAnnotation):
+    """
+    Reads an MSigDB GMT file into a pandas DataFrame.
+    GMT format: Pathway ID \t Pathway Description \t Gene1 \t Gene2 \t ...
+    Each line (pathway) can have a different number of genes.
+    """
+    pathway_data = [] # List to store dictionaries, each representing a pathway's data
+    try:
+        with open(path_pathwayAnnotation, 'r', encoding='utf-8') as f: # Specify encoding for robustness
+            for line_num, line in enumerate(f, 1): # Enumerate to get line number for better error messages
+                # Remove leading/trailing whitespace and split by tab
+                parts = line.strip().split('\t')
+                
+                # A valid GMT line must at least have Pathway ID and Description
+                if len(parts) < 2:
+                    if line.strip(): # If it's not just an empty line
+                        print(f"Warning: Skipping malformed line {line_num} (less than 2 fields): {line.strip()}")
+                    continue 
+                
+                pathway_id = parts[0]
+                pathway_description = parts[1]
+                gene_set = parts[2:] # All subsequent parts are the genes, stored as a list
+
+                pathway_data.append({
+                    "Pathway_ID": pathway_id,
+                    "Pathway_Description": pathway_description,
+                    "Gene_Set": gene_set # Store the list of genes directly in a column
+                })
+        
+        # Create DataFrame from the collected data
+        dfPathway = pd.DataFrame(pathway_data)
+    
+        return dfPathway
+
+    except FileNotFoundError:
+        sys.exit(f"Error: Pathway annotation file not found at '{path_pathwayAnnotation}'. Please check the path.")
+    except Exception as e:
+        sys.exit(f"Error reading or parsing pathway annotation file (line {line_num}): {e}. Content: {line.strip()}")
+
 ##################################################################################################################################
 ################################################  CREATE ANNOTATION DATAFRAMES  ##################################################
 ##################################################################################################################################
@@ -238,6 +277,9 @@ def annotateSets(SNPList, geneList, buffer=0):
 	dfAnnotation.index = range(len(dfAnnotation))  #Reassign indices
 	return dfAnnotation
 
+def annotatePathways(annotationDF):
+	# create a df where each row is a pathway, one column is a list of pointers/indices to genes in dfAnnotation
+	return
 def dropSingletonSets(annotationDF, SNPList, geneList, buffer):
 	"""
 	Helper function for annotate()
@@ -329,4 +371,20 @@ def getMaskMatrix(SNPList_path, annotationDF, outputFile):
 	message="Saving annotation mask to file "+outputFile+" in tab-delimited format"
 	np.savetxt(outputFile, mask, delimiter="\t")
 	print(message)
-	return mask
+	return masks
+
+def getPathwayMatrix(SNPList_path, annotationDF, pathwayDF, outputFile):
+	# p = len of snp list (make sure snp list already deleted snps that dont match to genes)
+	p = 2
+	q = len(pathwayDF)
+	mask = np.zeros((p, q))
+	for col_idx, pathway_row in pathwayDF.iterrows():
+		geneSet = pathway_row['Gene_Set']
+		for 
+	
+
+
+
+
+    # todo: prune snps that dont match to pathways 
+    return
