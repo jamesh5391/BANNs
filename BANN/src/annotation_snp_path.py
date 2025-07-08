@@ -34,6 +34,8 @@ import natsort as ns #natural sorting
 import sys
 import time 
 import math
+from bgen_reader import open_bgen
+
 
 ##################################################################################################################################
 ###################################  READING IN GUIDE FILES AND CONVERTING INTO DATA FRAMES  #####################################
@@ -302,11 +304,8 @@ def dropSingletonSets(annotationDF, SNPList, geneList, buffer):
 	annotationDF=annotateSets(SNPList, geneList, buffer=buffer)
 	return annotationDF
 
-def pruneExtraneousSNPs():
-	#make sure SNP List indices are adjusted 
-	
-	return
-	
+
+
 def annotate(path_SNPList, path_geneGuide,  outputFile, intergenic=False, buffer=0, dropSingletons=False):
 	"""
 	Function to create a SNP-to-SNPset annotation dataframe. 
@@ -342,8 +341,6 @@ def annotate(path_SNPList, path_geneGuide,  outputFile, intergenic=False, buffer
 	if dropSingletons==True:
 		print("Dropping SNP-sets that are singletons (containing only one SNP) and re-annotating SNPs without them")
 		dfAnnotation=dropSingletonSets(dfAnnotation, SNPList, geneList, buffer=buffer)
-
-	#Remove all irrelevant SNPs that don't map to any genes
 
 	# Save the resulting annotationDF to a file for future reference:
 	message="Saving annotation results to file "+outputFile
@@ -382,35 +379,83 @@ def getMaskMatrix(SNPList_path, annotationDF, outputFile):
 	print(message)
 	return mask
 
-def getPathwayMatrix(SNPList_path, annotationDF, pathwayDF, outputFile):
+def getPathwayMatrix(annotationDF, pathwayDF, outputFile):
 	# p = len of snp list (make sure snp list already deleted snps that dont match to genes)
 	p = 2
 	q = len(pathwayDF)
+	relevantSNPidxs = set()
 	mask = np.zeros((p, q))
+	#for each pathway, get its genes 
 	for col_idx, pathway_row in pathwayDF.iterrows():
 		geneSet = set(pathway_row['Gene_Set'])
 		pathwaySNPidxs = set()
+		#for each gene, get its SNPs
 		for gene in geneSet: 
 			geneSNPs = annotationDF[annotationDF['GeneID'] == gene]
 			if not geneSNPs.empty:
 				for snp_idx_list in geneSNPs['SNPindex']:
 					pathwaySNPidxs.update(snp_idx_list)
+		relevantSNPidxs.update(pathwaySNPidxs)
+					
 		if geneSet:
 			mask[list(pathwaySNPidxs), col_idx] = 1
 	'''
 	potential edge cases: 
 		multiple rows with same geneID in dfAnnotation?
-		pathway has 0 genes found and thus 0 snps
 		pathway has x genes but no snps
 		what if there are genes that don't belong to any pathways?
 	'''
 	message="Saving pathway annotation mask to file "+outputFile+" in tab-delimited format"
 	np.savetxt(outputFile, mask, delimiter="\t")
 	print(message)
-	return mask 
+	return mask, relevantSNPidxs
 
 		
 
-			
+def intializeInputs(dfAnnotation, dfPathway, bgen_path, sample_file_path, X_outputFile, y_outputFile, mask_outputFile):
+	'''
+	Returns X, y, pathway annotation mask
+	'''
+	#Get pathway annotation mask / relevant SNP ids 
+	print("Preparing pathway annotation mask...")
+	mask, relevantSNPidxs = getPathwayMatrix(dfAnnotation, dfPathway, mask_outputFile)
+
+	#Read in SNP list
+	print("Reading in SNP list...")
+	SNPlist = []	
+
+	#Filter out irrelevant SNPs
+	SNPlist_filtered = SNPlist[relevantSNPidxs]
+
+	#Parse BGEN and create X
+	print(f"Loading and filtering genotypes from BGEN file: {bgen_path}...")
+	try:
+		bgen = bgen_reader.open_bgen(bgen_path, sample_file_path)
+        
+        # Get the original 0-based indices from the BGEN file that correspond to our filtered SNPs
+		bgen_internal_snp_indices_to_load = SNPList_final_filtered['original_bgen_snp_idx'].tolist()
+		X_filtered = bgen.read(
+            variant_indices=bgen_internal_snp_indices_to_load,
+            dtype=bgen_dtype,
+            dosage=bgen_dosage
+        )
+		print(f"Loaded X matrix of shape {X_filtered.shape} (Individuals x Filtered SNPs).")
+	except Exception as e:
+		sys.exit(f"Error loading and filtering BGEN data with bgen_reader: {e}")
+	
+	#Prepare phenotype dataset
+	y = []
+
+	
+	#Validation checks for datasets
+
+	return X_filtered, y, mask 
+
+
+
+
+
+
+
 
     # todo: prune snps that dont match to pathways
