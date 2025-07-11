@@ -92,8 +92,8 @@ class BANNs(object):
 		self.SET_layer.train(self.G, self.y, 10000)
 		self.SET_layer.w = normalizelogweights(self.SET_layer.logw)
 
-		self.SNP_layer.pve=self.estimatePVE(self.SNP_layer,self.X)
-		self.SET_layer.pve=self.estimatePVE(self.SET_layer,self.G)
+		#self.SNP_layer.pve=self.estimatePVE(self.SNP_layer,self.X)
+		#self.SET_layer.pve=self.estimatePVE(self.SET_layer,self.G)
 		self.summarize_results(self.SNP_layer)
 		self.summarize_results(self.SET_layer)
 		return [self.SNP_layer, self.SET_layer]
@@ -101,6 +101,7 @@ class BANNs(object):
 	def summarize_results(self,layer):
 		layer.pip=np.sum(layer.w * layer.pip, axis=1)
 		layer.kernel=np.sum(layer.w * layer.kernel, axis=1)
+
 
 # X = np.loadtxt("Xtest2.txt")
 # y = np.loadtxt("ytest2.txt")
