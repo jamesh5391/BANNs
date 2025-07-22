@@ -1,6 +1,8 @@
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+import pickle
+import copy
 from utils import *
 from customModel import *
 import matplotlib.pyplot as plt
@@ -16,10 +18,17 @@ class BANNs(object):
 		self.optimizer=tf.compat.v1.train.GradientDescentOptimizer(1e-4, use_locking=False, name='GradientDescent')
 		self.checkInputs()
 
+		print("Compute mean, std")
+		self.X_mean = np.mean(self.X, axis=0)
+		self.X_std = np.std(self.X, axis=0)
+		self.y_mean = np.mean(self.y)
+		self.y_std = np.std(self.y)
+
 		if maf!=None:
 			self.QC_SNPs()
 
 		if centered==False:
+			print("Scaling inputs...")
 			self.center_scale_inputs()
 
 	def checkInputs(self):
@@ -68,6 +77,7 @@ class BANNs(object):
 		self.X=self.X[:,currentMAF>maf]
 
 	def center_scale_inputs(self):
+
 		self.X=np.nan_to_num((self.X-np.mean(self.X, axis=0))/np.std(self.X,axis=0)) # Standardized genotype matrix based on means and standard deviations
 		self.y=np.nan_to_num((self.y-np.mean(self.y))/np.std(self.y)) # Standardized phenotype array based on means and standard deviations
 
@@ -94,9 +104,40 @@ class BANNs(object):
 
 		#self.SNP_layer.pve=self.estimatePVE(self.SNP_layer,self.X)
 		#self.SET_layer.pve=self.estimatePVE(self.SET_layer,self.G)
+
+		
+		self.SNP_layer_original = copy.deepcopy(self.SNP_layer)
+		self.SET_layer_original = copy.deepcopy(self.SET_layer)
+		print("kernel2:", self.SNP_layer_original.kernel.shape)
+		##summarize results flattens pip and kernels
 		self.summarize_results(self.SNP_layer)
 		self.summarize_results(self.SET_layer)
+		print("kernel3:", self.SNP_layer_original.kernel.shape)
+
+
 		return [self.SNP_layer, self.SET_layer]
+	
+	def save_model(self, file_path='banns_model.pkl'):
+		model = {
+			"SNP_w": self.SNP_layer_original.w,
+			"SNP_pip": self.SNP_layer_original.pip,
+			"SNP_kernel": self.SNP_layer_original.kernel,
+			"SNP_bias": self.SNP_layer_original.bias,
+
+			"SET_w": self.SET_layer_original.w,
+			"SET_pip": self.SET_layer_original.pip,
+			"SET_kernel": self.SET_layer_original.kernel,
+			"SET_bias": self.SET_layer_original.bias,
+
+			"X_mean": self.X_mean,
+			"X_std": self.X_std,
+			"y_mean": self.y_mean,
+			"y_std": self.y_std
+		}
+		with open(file_path, 'wb') as f:
+			pickle.dump(model, f)
+			print(f"Trained model saved to {file_path}")
+
 
 	def summarize_results(self,layer):
 		layer.pip=np.sum(layer.w * layer.pip, axis=1)

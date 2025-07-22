@@ -17,9 +17,6 @@ def main():
 
     bann=BANNs(X,y, mask, nModelsSNP=20, nModelsSET=20)
     [SNP_layer, SET_layer]=bann.run()
-    print("PVE")
-    #print(SNP_layer.pve)
-    #print(SET_layer.pve)
 
     SNPpips=SNP_layer.pip
     SETpips=SET_layer.pip
@@ -33,11 +30,8 @@ def main():
     plt.savefig("SETpips.png")
 
     #Export model parameters
-    np.save('../../../data/processed/bann/model/SNP_weights.npy', SNP_layer.w)
-    np.save('../../../data/processed/bann/model/SNP_pips.npy', SNP_layer.pip)
-    np.save('../../../data/processed/bann/model/SNP_kernel.npy', SNP_layer.kernel)
+    bann.save_model()
 
 
-    
     
     
