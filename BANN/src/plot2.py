@@ -3,25 +3,26 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os 
 import seaborn as sns
+from scipy.stats import spearmanr
 
 def plot(x, y, title, out_name, clip=None):
-	sns.set_context("poster", font_scale=1.2)
+	sns.set_context("talk", font_scale=1.2)
 	sns.set_style("whitegrid")
 	plt.figure(figsize=(8,8))
 	if clip:
-		#plt.title(f"{title} (Clipped)", fontsize=30, fontweight='bold')
-		plt.scatter(x.clip(upper=clip), y.clip(upper=clip), alpha=0.7, linewidths=0.8, s=100, edgecolors='black')
+		plt.title(f"{title} (Clipped)", fontsize=30, fontweight='bold')
+		plt.scatter(x.clip(upper=clip), y.clip(upper=clip), alpha=0.7, linewidths=0.5, s=80, edgecolors='black')
 	else:
-		#plt.title(title, fontsize=20, fontweight='bold') 
+		plt.title(title, fontsize=20, fontweight='bold') 
 		plt.scatter(x, y, alpha=0.7, edgecolors='black', linewidths=0.5, s=80)
 	
-	plt.xlabel(r'$-\log_{10}(p)$ PRSet', fontsize=24)
-	plt.ylabel(r'$-\log_{10}(p)$ BANN', fontsize=24)
+	plt.xlabel(r'$-\log_{10}(p)$ PRSet', fontsize=20)
+	plt.ylabel(r'$-\log_{10}(p)$ BANN', fontsize=20)
 	plt.axline((0, 0), slope=1, color='gray', linestyle='--', linewidth=2)
 	
-	plt.xticks(fontsize=18)
-	plt.yticks(fontsize=18)
-	plt.grid(True, linestyle='--', alpha=0.5)
+	plt.xticks(fontsize=14)
+	plt.yticks(fontsize=14)
+	plt.grid(True, linestyle='--', alpha=0.3)
 
 	sns.despine()
 
@@ -29,9 +30,10 @@ def plot(x, y, title, out_name, clip=None):
 
 	plt.savefig(out_name, dpi=300, bbox_inches='tight')
 
-#RESULTS FOR MAIN EFFECTS 
-print("#######HI########")
-print("CWD:", os.getcwd())
+'''
+MAIN EFFECTS
+'''
+
 bann_main_df = pd.read_csv('BANNS/BANN/src/main_effect_relu_res_df.csv')
 prset_main_df = pd.read_csv('BANNS/BANN/src/main_effects_res_df.csv')
 prset_main_df = prset_main_df.iloc[2:]
@@ -41,16 +43,15 @@ main_effects_bann = bann_main_df[bann_main_df['term'] == 'ppgs']
 main_effects_prset = prset_main_df[prset_main_df['term'] == 'ppgs']
 
 #Filter by PRSet p-value < 0.05
-main_effects_prset_significant = main_effects_prset[main_effects_prset['p.value'] < 0.05]
+main_effects_bann_significant = main_effects_bann[main_effects_bann['p.value'] < 0.05]
 
 # keeps only the pathways that are significant in PRSet AND also exist in the BANN results.
-merged_df = pd.merge(main_effects_bann, main_effects_prset_significant, on='pathway', suffixes=('_bann', '_prset'))
+merged_df = pd.merge(main_effects_bann_significant, main_effects_prset, on='pathway', suffixes=('_bann', '_prset'))
 
 
 main_z_ratios = (merged_df['statistic_bann'] / merged_df['statistic_prset'].replace(0, pd.NA)).dropna()
 main_z_ratios.index = merged_df['pathway'] 
-print("Main effect z ratios:")
-print(main_z_ratios.describe())
+
 
 bann_logp = -np.log10(merged_df['p.value_bann'].clip(lower=1e-200))
 prset_logp = -np.log10(merged_df['p.value_prset'].clip(lower=1e-200))
@@ -62,11 +63,10 @@ plot(prset_logp, bann_logp, main_title, "main_effects_scatter_clip30.png", clip=
 # Calculate, sort, and print top main effect ratios
 main_ratios = bann_logp / prset_logp.replace(0, np.nan)
 main_ratios.index = merged_df['pathway'] # Assign pathway names for readability
-
 top_main_ratios = main_ratios.sort_values(ascending=False)
 
 print("--- Top 10 Pathways with Highest BANN/PRSet Main Effect Ratios ---")
-print(top_main_ratios.head(10))
+print(top_main_ratios.head(20))
 print("-" * 60)
 
 bann_better_main = np.sum(merged_df['p.value_bann'] < merged_df['p.value_prset'])
@@ -77,17 +77,16 @@ print(f"BANN had greater statistical significance in {percent_bann_better_main:.
 print(f"Compared a total of {total_main} pathways.")
 print("-" * 30)
 
-
+print()
 merged_all_df = pd.merge(main_effects_bann, main_effects_prset, on='pathway', suffixes=('_bann', '_prset'))
 interaction_corr_all = np.corrcoef(merged_all_df['estimate_bann'], merged_all_df['estimate_prset'])
 print(f"The correlation for ALL main effect sizes is: {interaction_corr_all[0, 1]:.4f}")
+print()
 
 interaction_corr_sig = np.corrcoef(merged_df['estimate_bann'], merged_df['estimate_prset'])
-print("Number of signiificant pathways: ", len(main_effects_prset_significant))
+print("Number of signiificant pathways: ", len(main_effects_bann_significant))
 print(f"The correlation for SIGNIFICANT main effect sizes is: {interaction_corr_sig[0, 1]:.4f}")
-
-#corr = np.corrcoef(main_effects_bann['estimate'], main_effects_prset['estimate'])
-#np.savetxt('beta_corr.txt', corr)
+print()
 
 
 
@@ -100,19 +99,11 @@ bann_df = bann_df[bann_df['term'] == 'ppgs:bmi']
 prset_df = prset_df[prset_df['term'] == 'ppgs:bmi']
 
 
-# CHANGE 1: Filter only the PRSet dataframe for p-values < 0.05
-prset_df_significant = prset_df[prset_df['p.value'] < 0.05]
+# Filter only the BANN dataframe for p-values < 0.05
+bann_df_significant = bann_df[bann_df['p.value'] < 0.05]
 
-# CHANGE 2: Perform an inner merge to align the dataframes
 # This keeps only the pathways that are significant in PRSet AND also exist in the BANN results.
-merged_df = pd.merge(bann_df, prset_df_significant, on='pathway', suffixes=('_bann', '_prset'))
-
-    # 1. Check if the dataframes have the same number of rows
-if len(bann_df) != len(prset_df):
-    print(f"Validation FAILED: DataFrames have different lengths ({len(prset_df)} vs {len(bann_df)}).")
-    
-    # 2. Check if the values in the specified column are identical and in the same order
-    # The .equals() method is a strict check for this.
+merged_df = pd.merge(bann_df_significant, prset_df, on='pathway', suffixes=('_bann', '_prset'))
 
 
 merged_all_df = pd.merge(bann_df, prset_df, on='pathway', suffixes=('_bann', '_prset'))
@@ -120,14 +111,13 @@ interaction_corr_all = np.corrcoef(merged_all_df['estimate_bann'], merged_all_df
 print(f"The correlation for ALL interaction effect sizes is: {interaction_corr_all[0, 1]:.4f}")
 
 interaction_corr_sig = np.corrcoef(merged_df['estimate_bann'], merged_df['estimate_prset'])
-print("Number of signiificant pathways: ", len(prset_df_significant))
+print("Number of signiificant pathways: ", len(bann_df_significant))
 print(f"The correlation for SIGNIFICANT interaction effect sizes is: {interaction_corr_sig[0, 1]:.4f}")
 
 # CHANGE 2: Calculate the z-ratios for the interaction effects
 interaction_z_ratios = (merged_df['statistic_bann'] / merged_df['statistic_prset'].replace(0, pd.NA)).dropna()
 interaction_z_ratios.index = merged_df['pathway'] # Set pathway as index
-print("Interaction z ratios:")
-print(interaction_z_ratios.describe())
+
 
 # CHANGE 3: Combine the ratios and calculate the correlation
 # Combine the two ratio Series into a single DataFrame, aligning by pathway
@@ -136,10 +126,15 @@ combined_ratios_df = pd.concat([main_z_ratios.rename('main_effect_z_ratio'),
                                axis=1).dropna()
 
 # Calculate the Pearson correlation between the two columns
-correlation = combined_ratios_df['main_effect_z_ratio'].corr(combined_ratios_df['interaction_z_ratio'])
+correlation, p_val = spearmanr(combined_ratios_df['main_effect_z_ratio'], combined_ratios_df['interaction_z_ratio'])
+#correlation = combined_ratios_df['main_effect_z_ratio'].spearmanr(combined_ratios_df['interaction_z_ratio'])
 
 print("--- Correlation between Main and Interaction Effect Improvements ---")
-print(f"The Pearson correlation between the z-ratios is: {correlation:.4f}")
+#print(f"The Spearman correlation between the z-ratios is: {correlation}")
+print(f"The Spearman correlation is: {correlation:.4f}")
+print(f"The p-value is: {p_val:.4f}")
+
+
 print(f"Analysis was based on {len(combined_ratios_df)} overlapping pathways.")
 print("-" * 60)
 
@@ -158,7 +153,7 @@ interaction_ratios.index = merged_df['pathway'] # Assign pathway names
 top_interaction_ratios = interaction_ratios.sort_values(ascending=False)
 
 print("\n--- Top 10 Pathways with Highest BANN/PRSet Interaction Effect Ratios ---")
-print(top_interaction_ratios.head(10))
+print(top_interaction_ratios.head(20))
 print("-" * 60)
 
 # CHANGE 2: Calculate and print the percentage for interaction effects
@@ -181,12 +176,6 @@ def plotBox(x, title, out_name):
 	plt.tight_layout()
 
 	plt.savefig(out_name, dpi=300)
-
-#ratios = bann_logp / prset_logp
-#print(ratios.head(50))
-#print(ratios.describe())
-#log_ratios = np.log10(ratios.replace(0, np.nan).dropna())
-
 
 
 z_ratios = bann_df['statistic'] / prset_df['statistic'].replace(0, pd.NA)
